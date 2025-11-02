@@ -2036,7 +2036,7 @@ class PerfDatabase:
             ops = (
                 b * num_heads * 2 / 2 * (s * s * 192 + s * s * 128)
             )  # 2 for fma, 2 for causality. num_heads, for local heads
-            mem_bytes = b * num_heads * 2 * (2 * s * 192 + 2 * s * 128)  # 2 for fp16, TODO
+            mem_bytes = b * num_heads * kvcache_quant_mode.value.memory * (s * 192 + s * 128)# 2 for fp16, TODO
             sol_math = ops / self.system_spec["gpu"]["float16_tc_flops"] * 1000 / fmha_quant_mode.value.compute
             sol_mem = mem_bytes / self.system_spec["gpu"]["mem_bw"] * 1000
             sol_time = max(sol_math, sol_mem)
@@ -2075,9 +2075,10 @@ class PerfDatabase:
             ops = 2 * b * num_heads * 1088 * s  # 2 for fma
             # kvcache load bytes will depend on kvcache quant.
             # while input q and output might be in fp16.
-            mem_bytes = b * (num_heads * 1088 * 2 + (s - 1) * 1088 * kvcache_quant_mode.value.memory)
+            mem_bytes = b * (num_heads * 1088 + (s - 1) * 512) * kvcache_quant_mode.value.memory # compute dtyoe is consistent with kv_cache
 
-            sol_math = ops / self.system_spec["gpu"]["float16_tc_flops"] * 1000  # only fp16
+            compute = 1 if kvcache_quant_mode == common.KVCacheQuantMode.float16 else 2 # compute dtyoe is consistent with kv_cache
+            sol_math = ops / self.system_spec["gpu"]["float16_tc_flops"] * 1000 / compute
             sol_mem = mem_bytes / self.system_spec["gpu"]["mem_bw"] * 1000
             sol_time = max(sol_math, sol_mem)
             return sol_time, sol_math, sol_mem
