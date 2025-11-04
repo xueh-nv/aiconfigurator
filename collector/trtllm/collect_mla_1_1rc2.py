@@ -221,6 +221,9 @@ def run_mla(
     kv_cache_tokens_per_block = tokens_per_block
     # device = torch.device('cuda')
     dtype = scenario.dtype
+
+    assert num_heads % tp_size == 0, "num_heads != N * tp_size"
+    num_heads = num_heads // tp_size
     num_kv_heads = num_heads
 
     context_sequence_lengths = [input_len for _ in range(batch_size)]

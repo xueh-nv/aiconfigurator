@@ -140,14 +140,11 @@ def run_mla(
     torch.cuda.set_device(device)
     backend_name = "TRTLLM"
     layer_idx = 0
-    num_key_value_heads = num_heads
 
-    assert num_key_value_heads % tp_size == 0, "num_key_value_heads != N * tp_size"
     assert kv_cache_dtype == tensorrt_llm.bindings.DataType.BF16, "only support bfloat16 for trtllm"
-    num_key_value_heads = int(num_key_value_heads / tp_size)
-
     assert num_heads % tp_size == 0, "num_heads != N * tp_size"
-    num_heads = int(num_heads / tp_size)
+    num_heads = num_heads // tp_size
+    num_key_value_heads = num_heads
 
     pos_embd_params = PositionalEmbeddingParams(
         type=PositionEmbeddingType.yarn,
@@ -394,8 +391,8 @@ def run_mla(
     log_perf(
         item_list=[
             {
-                "mla_dtype": "bfloat16",
-                "kv_cache_dtype": "bfloat16",
+                "mla_dtype": "float16",
+                "kv_cache_dtype": "float16",
                 "num_heads": num_heads,
                 "batch_size": batch_size,
                 "isl": isl,
