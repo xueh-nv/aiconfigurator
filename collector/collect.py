@@ -267,12 +267,12 @@ def parallel_run(tasks, func, num_processes, module_name="unknown"):
     # Wait for processes
     for p in processes:
         if "moe" in func.__name__:
-            p.join()
+            p.join(timeout = 2000)
         else:
             p.join(timeout = 10)
-            if p.is_alive():
-                logger.warning(f"Process {p.pid} did not terminate, forcing...")
-                p.terminate()
+        if p.is_alive():
+            logger.warning(f"Process {p.pid} did not terminate, forcing...")
+            p.terminate()
 
     # Log summary
     if errors:

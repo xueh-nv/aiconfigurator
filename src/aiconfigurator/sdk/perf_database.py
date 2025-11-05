@@ -2078,7 +2078,7 @@ class PerfDatabase:
             ops = 2 * b * num_heads * 1088 * s  # 2 for fma
             # kvcache load bytes will depend on kvcache quant.
             # while input q and output might be in fp16.
-            mem_bytes = b * (num_heads * 1088 * 2 + (s - 1) * 512 * kvcache_quant_mode.value.memory) # fp16 io + fp16/fp8 kv cache, TODO fp8 io 
+            mem_bytes = b * (num_heads * 1088 * 2 + (s - 1) * 576 * kvcache_quant_mode.value.memory) # fp16 io + fp16/fp8 kv cache, TODO fp8 io 
 
             sol_math = ops / self.system_spec["gpu"]["float16_tc_flops"] * 1000 / quant_mode_gen.value.compute
             sol_mem = mem_bytes / self.system_spec["gpu"]["mem_bw"] * 1000
