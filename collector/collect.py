@@ -267,9 +267,9 @@ def parallel_run(tasks, func, num_processes, module_name="unknown"):
     # Wait for processes
     for p in processes:
         if "moe" in func.__name__:
-            p.join(timeout = 2000)
+            p.join(timeout=2000)
         else:
-            p.join(timeout = 10)
+            p.join(timeout=10)
         if p.is_alive():
             logger.warning(f"Process {p.pid} did not terminate, forcing...")
             p.terminate()
@@ -376,7 +376,8 @@ def collect_trtllm(num_processes: int, ops: list[str] | None = None):
             "get_func": "get_context_mla_test_cases",
             "run_func": "run_mla",
             "version_handler": lambda v: "trtllm.collect_mla_1_1rc2"
-            if v.startswith(("1.1.0", "1.2.0")) else "trtllm.collect_mla",
+            if v.startswith(("1.1.0", "1.2.0"))
+            else "trtllm.collect_mla",
         },
         {
             "name": "trtllm",
@@ -385,7 +386,8 @@ def collect_trtllm(num_processes: int, ops: list[str] | None = None):
             "get_func": "get_generation_mla_test_cases",
             "run_func": "run_mla",
             "version_handler": lambda v: "trtllm.collect_mla_1_1rc2"
-            if v.startswith(("1.1.0", "1.2.0")) else "trtllm.collect_mla",
+            if v.startswith(("1.1.0", "1.2.0"))
+            else "trtllm.collect_mla",
         },
         # Attention collections - separate entries for context and generation
         {

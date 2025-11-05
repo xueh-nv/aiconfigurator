@@ -21,7 +21,7 @@ from helper import log_perf
 
 
 def get_context_mla_test_cases():
-    dtype_list = [tensorrt_llm.bindings.DataType.BF16] # not support f8 for trt < v1.1
+    dtype_list = [tensorrt_llm.bindings.DataType.BF16]  # not support f8 for trt < v1.1
     test_cases = []
     n_list = [128]
     b_list = [1, 2, 4, 8, 16, 32, 64, 128, 256]
@@ -72,7 +72,7 @@ def get_context_mla_test_cases():
 
 
 def get_generation_mla_test_cases():
-    dtype_list = [tensorrt_llm.bindings.DataType.BF16] # not support f8 for trt < v1.1
+    dtype_list = [tensorrt_llm.bindings.DataType.BF16]  # not support f8 for trt < v1.1
     test_cases = []
     n_list = [128]
     for n in n_list:

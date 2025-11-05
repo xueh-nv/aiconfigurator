@@ -126,6 +126,7 @@ def get_generation_mla_test_cases():
                         )
     return test_cases
 
+
 # Copied from transformers.models.llama.modeling_llama.rotate_half
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
