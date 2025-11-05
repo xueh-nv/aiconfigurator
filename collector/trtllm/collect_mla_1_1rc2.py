@@ -25,6 +25,7 @@ from tensorrt_llm.sampling_params import SamplingParams
 
 from helper import log_perf
 
+
 def get_context_mla_test_cases():
     dtype_list = [tensorrt_llm.bindings.DataType.BF16, tensorrt_llm.bindings.DataType.FP8]
     test_cases = []
