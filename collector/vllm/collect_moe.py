@@ -10,7 +10,13 @@ from vllm.model_executor.layers.fused_moe import fused_experts
 from vllm.model_executor.layers.fused_moe.config import FusedMoEQuantConfig
 from vllm.version import __version__ as vllm_version
 
-from helper import get_sm_version, log_perf
+# from helper import get_sm_version, log_perf
+
+def get_sm_version():
+    return 86
+
+def log_perf(*args, **kwargs):
+    pass
 
 aic_debug = int(os.getenv("aic_moe_debug", "0"))  # noqa: SIM112
 
@@ -281,8 +287,14 @@ def run_moe_torch(
         w1 = w1.to(dtype)
         w2 = w2.to(dtype)
 
+    from inspect import currentframe, getframeinfo
+
     max_index = -1
     # Try to find the maximum number of tokens that can run successfully
+
+    import time
+    start_time = time.time()
+
     while True:
         try:
             hidden_states_max_tokens = (
@@ -325,9 +337,12 @@ def run_moe_torch(
 
     # Performance testing for each token count
     for num_tokens in num_tokens_lists:
+        print("num_tokens", num_tokens)
+        print("topk", topk)
         hidden_states = torch.randn([num_tokens, hidden_size]).bfloat16().to(device)
 
-        num_iter = 5 if distributed == "power_law" else 1
+        # num_iter = 5 if distributed == "power_law" else 1
+        num_iter = 5
         if distributed == "power_law":
             actual_logits_list = [
                 power_law_logits_v3(num_tokens, num_experts, topk, moe_ep_size, power_law_alpha)
@@ -337,6 +352,7 @@ def run_moe_torch(
             ]
         elif distributed == "balanced":
             actual_logits = balanced_logits(num_tokens, num_experts, topk).bfloat16().to(device)
+            print("logits shape: ", actual_logits.shape)
         else:
             raise ValueError(f"Unsupported distributed mode: {distributed}")
 
@@ -358,11 +374,58 @@ def run_moe_torch(
             num_warmups = 1
             num_runs = 1
 
-        # CUDA Graph capture
-        g = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(g):
+        elapsed = time.time() - start_time; start_time = time.time(); print(getframeinfo(currentframe()).lineno, elapsed)
+
+        # # CUDA Graph capture
+        # g = torch.cuda.CUDAGraph()
+        # with torch.cuda.graph(g):
+        #     if distributed == "power_law":
+        #         for tw, ti in zip(topk_weights_list, topk_ids_list):
+        #             print("tw", tw.shape, "ti", ti.shape)
+        #             _ = fused_experts(
+        #                 hidden_states,
+        #                 w1,
+        #                 w2,
+        #                 tw,
+        #                 ti,
+        #                 inplace=False,
+        #             )
+        #     else:
+        #         _ = fused_experts(
+        #             hidden_states,
+        #             w1,
+        #             w2,
+        #             topk_weights,
+        #             topk_ids,
+        #             inplace=False,
+        #         )
+        # elapsed = time.time() - start_time; start_time = time.time(); print(getframeinfo(currentframe()).lineno, elapsed)
+
+        # # Warmup
+        # for i in range(num_warmups):
+        #     g.replay()
+
+        # elapsed = time.time() - start_time; start_time = time.time(); print(getframeinfo(currentframe()).lineno, elapsed)
+
+        # # Performance measurement
+        # start_event = torch.cuda.Event(enable_timing=True)
+        # end_event = torch.cuda.Event(enable_timing=True)
+        # start_event.record()
+        # for i in range(num_runs):
+        #     g.replay()
+        # end_event.record()
+        # torch.cuda.synchronize()
+        # latency = start_event.elapsed_time(end_event) / num_runs / num_iter
+
+        def run():
             if distributed == "power_law":
-                for tw, ti in zip(topk_weights_list, topk_ids_list):
+                for i, (tw, ti) in enumerate(zip(topk_weights_list, topk_ids_list)):
+                    print("i", i)
+                    print("max: ", torch.max(tw), torch.max(ti))
+                    print("min: ", torch.min(tw), torch.min(ti))
+                    # print("tw", tw.shape, "ti", ti.shape)
+                    # print("tw: ", tw)
+                    # print("ti: ", ti)
                     _ = fused_experts(
                         hidden_states,
                         w1,
@@ -371,7 +434,11 @@ def run_moe_torch(
                         ti,
                         inplace=False,
                     )
+                    # break
             else:
+                # print("topk_weights shape: ", topk_weights.shape, "topk_ids shape: ", topk_ids.shape)
+                # print("topk_weights: ", topk_weights)
+                # print("topk_ids: ", topk_ids)
                 _ = fused_experts(
                     hidden_states,
                     w1,
@@ -383,17 +450,22 @@ def run_moe_torch(
 
         # Warmup
         for i in range(num_warmups):
-            g.replay()
+            run()
 
-        # Performance measurement
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
+
+        torch.cuda.synchronize()
         start_event.record()
         for i in range(num_runs):
-            g.replay()
+            run()
         end_event.record()
         torch.cuda.synchronize()
+
         latency = start_event.elapsed_time(end_event) / num_runs / num_iter
+        print(f"moe latency: {latency}")
+
+        elapsed = time.time() - start_time; start_time = time.time(); print(getframeinfo(currentframe()).lineno, elapsed)
 
         source = "vllm_fused_moe"
 
@@ -423,9 +495,14 @@ def run_moe_torch(
 
 if __name__ == "__main__":
     test_cases = get_moe_test_cases()
+    # test_cases = [['float16', [1, 2, 4, 8, 16, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 20480, 32768, 65536], 4096, 14336, 2, 8, 1, 2, 'MOE_Mixtral8x7B', 'moe_perf.txt', 'power_law', 1.2]]
+    test_cases = [['float16', [1, 2, 4, 8, 16, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 20480, 32768, 65536], 4096, 14336, 2, 8, 1, 2, 'MOE_Mixtral8x7B', 'moe_perf.txt', 'power_law', 1.01]]
+    # test_cases = [['float16', [128, 256, 320], 4096, 14336, 2, 8, 1, 2, 'MOE_Mixtral8x7B', 'moe_perf.txt', 'power_law', 1.01]]
+    # test_cases = [['float16', [1, 2, 4, 8, 16, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 20480, 32768, 65536], 4096, 14336, 2, 8, 1, 2, 'MOE_Mixtral8x7B', 'moe_perf.txt', 'balanced', 1.01]]
     print(f"Total test cases: {len(test_cases)}")
     
-    for test_case in test_cases:
+    for test_case in test_cases[:20]:
+        print(f"Running test case: {test_case}")
         try:
             run_moe_torch(*test_case)
         except Exception as e:
